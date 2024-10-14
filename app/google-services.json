@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "141435662648",
+    "project_id": "control-horario-prueba",
+    "storage_bucket": "control-horario-prueba.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:141435662648:android:b05f3003fbe225d22051cd",
+        "android_client_info": {
+          "package_name": "net.azarquiel.controlhorario"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVMJzARFfPqoAc6GELiqhgTBDavXxy_D8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
