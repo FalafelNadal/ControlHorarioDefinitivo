@@ -26,11 +26,8 @@ class AuthActivity : AppCompatActivity() {
         val bundle = Bundle()
         bundle.putString("message", "Integración de Firebase completa")
         analytics.logEvent("InitScreen", bundle)
-
         setup()
     }
-
-
     private fun setup() {
 
         title = "Autenticación"

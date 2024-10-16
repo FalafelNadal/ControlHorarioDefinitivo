@@ -7,7 +7,9 @@
     android:background="@android:color/white"
     tools:context=".AuthActivity">
 
+
     <LinearLayout
+        android:id="@+id/linearLayout2"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
@@ -48,6 +50,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:backgroundTint="#DC3445"
                 android:text="Registrarse" />
 
             <Button
@@ -55,7 +58,50 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:backgroundTint=" #652a83 "
                 android:text="Acceder" />
         </LinearLayout>
     </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <TextView
+            android:id="@+id/footerTextView2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background=" #652a83 "
+            android:gravity="center"
+            android:padding="16dp"
+            android:text="Desarrollado por EC-INNOVA 2023"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/headerTextView3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background=" #652a83 "
+        android:gravity="center"
+        android:padding="16dp"
+        android:text="EC-INNOVA"
+        android:textColor="@color/white"
+        android:textSize="20sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/logInSignUpTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Registro o inicio de sesión"
+        android:textSize="16sp"
+        app:layout_constraintBottom_toTopOf="@+id/linearLayout2"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/headerTextView3" />
 </androidx.constraintlayout.widget.ConstraintLayout>

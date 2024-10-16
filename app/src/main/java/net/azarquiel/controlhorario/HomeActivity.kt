@@ -2,7 +2,9 @@ package net.azarquiel.controlhorario
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +59,66 @@ class HomeActivity : AppCompatActivity() {
         startButton = findViewById(R.id.startButton)
 
         setupTimeButtons()
+        createDynamicLayouts()
+
+    }
+    private fun createDynamicLayouts() {
+        val mainLayout = findViewById<LinearLayout>(R.id.mainLayout) // El contenedor donde agregarás los LinearLayouts
+
+        for (i in 1..6) {
+            // Crear un nuevo LinearLayout
+            val linearLayout = LinearLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                orientation = LinearLayout.HORIZONTAL
+            }
+
+            // Crear y añadir los TextView dentro del LinearLayout
+            val textView8 = createTextView("*")
+            val textView9 = createTextView("Inicio")
+            val textView10 = createTextView("Pausa")
+            val textView11 = createTextView("Fin")
+            val textView12 = createTextView("Total")
+
+            // Añadir todos los TextView al LinearLayout
+            linearLayout.addView(textView8)
+            linearLayout.addView(textView9)
+            linearLayout.addView(textView10)
+            linearLayout.addView(textView11)
+            linearLayout.addView(textView12)
+
+            // Añadir el LinearLayout al layout principal
+            mainLayout.addView(linearLayout)
+
+            // Añadir un divisor entre los LinearLayouts
+            val divider = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    1 // Altura del divisor
+                ).apply {
+                    setMargins(0, 10, 0, 10) // Márgenes opcionales
+                }
+                setBackgroundResource(android.R.color.darker_gray) // Color del divisor
+            }
+            mainLayout.addView(divider)
+        }
+    }
+
+    private fun createTextView(text: String): TextView {
+        return TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            ).apply {
+                setMargins(0, 10, 0, 10)
+            }
+            this.text = text
+            textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
     }
 
     private fun setup(email: String) {
@@ -106,7 +168,6 @@ class HomeActivity : AppCompatActivity() {
                 startTimer()
                 startButton.text = "Terminar"
             }
-
         }
     }
 
@@ -132,21 +193,25 @@ class HomeActivity : AppCompatActivity() {
         isRunning = false
         timerJob?.cancel()
     }
-
     private fun saveSessionData() {
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val currentDate = dateFormat.format(Date())
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val email = FirebaseAuth.getInstance().currentUser?.email ?: return
-
+        val year = currentDate.substring(0, 4)
+        val yearMonth = currentDate.substring(0, 7)
+        db.collection("horarios").document("1").get()
         val sessionData = hashMapOf(
             "email" to email,
+            "año" to year,
+            "añomes" to yearMonth,
+            "fecha" to currentDate,
+            "fin" to "",
+            "inicio" to "",
             "tiempo_dia" to timerDayTextView.text.toString(),
             "tiempo_total" to timerWeekTextView.text.toString(),
         )
-
-        val db = FirebaseFirestore.getInstance()
 
         db.collection("registros_horarios")
             .document("trabajadores")
@@ -159,6 +224,28 @@ class HomeActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 println("Error al guardar los datos: ${e.message}")
             }
+        }
+    private fun arrayDias() {
+        db.collection("horarios").document("1").get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val diasNumericos = document.get("dias") as? List<Long>
+                    if (diasNumericos != null) {
+                        val diasSemana = listOf("Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado")
+                        for (numero in diasNumericos) {
+                            if (numero in 0..6) {
+                                val dia = diasSemana[numero.toInt()]
+                                println("Día: $dia")
+                            }
+                        }
+                    } else {
+                        println("El array 'dias' no está disponible.")
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                println("Error al obtener el array de días: ${e.message}")
+            }
     }
 
-}
+ }
