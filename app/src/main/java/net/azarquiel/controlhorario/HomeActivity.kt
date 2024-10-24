@@ -15,9 +15,18 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.SetOptions
+import java.text.ParseException
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-
+import java.util.concurrent.TimeUnit
+import android.content.SharedPreferences
+import android.content.Context
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import com.google.firebase.firestore.FieldValue
+import kotlinx.coroutines.*
 
 enum class ProviderType {
     BASIC
@@ -35,8 +44,21 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var hoursDayTextView: TextView
     private lateinit var timerDayTextView: TextView
     private lateinit var timerWeekTextView: TextView
+    private lateinit var percentageDayTextView: TextView
+    private lateinit var percentageWeekTextView: TextView
+    private val calendar = Calendar.getInstance()
+    private val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - 1
+    private var totalSecondsWeek = 0
+    private var currentDaySeconds = 0
+    private var isPaused = false
+    private var pauseStartTime = 0L
+    private var totalPauseDuration = 0L
+    private var pauseStartDateTime: String = ""
+    private var pauseEndDateTime: String = ""
     private var email: String? = null
     private var timerJob: Job? = null
+    private var hasResetHours = false
+    private lateinit var sharedPreferences: SharedPreferences
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -46,7 +68,6 @@ class HomeActivity : AppCompatActivity() {
 
         val bundle = intent.extras
         email = bundle?.getString("email")
-        val provider = bundle?.getString("provider")
 
         setup(email ?: "")
         timerWeekTextView = findViewById(R.id.timerWeekTextView)
@@ -55,54 +76,84 @@ class HomeActivity : AppCompatActivity() {
         hoursDayTextView = findViewById(R.id.hoursDayTextView)
         hoursWeekTextView = findViewById(R.id.hoursWeekTextView)
         timerDayTextView = findViewById(R.id.timerDayTextView)
+        percentageDayTextView = findViewById(R.id.percentageDayTextView)
+        percentageWeekTextView = findViewById(R.id.percentageWeekTextView)
         stopButton = findViewById(R.id.stopButton)
         startButton = findViewById(R.id.startButton)
 
         setupTimeButtons()
         createDynamicLayouts()
-
+        hoursDay()
+        hoursWeek()
     }
+
     private fun createDynamicLayouts() {
-        val mainLayout = findViewById<LinearLayout>(R.id.mainLayout) // El contenedor donde agregarás los LinearLayouts
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val currentDate = Date()
+        val calendar = Calendar.getInstance()
 
-        for (i in 1..6) {
-            // Crear un nuevo LinearLayout
-            val linearLayout = LinearLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                orientation = LinearLayout.HORIZONTAL
-            }
+        val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
 
-            // Crear y añadir los TextView dentro del LinearLayout
-            val textView8 = createTextView("*")
-            val textView9 = createTextView("Inicio")
-            val textView10 = createTextView("Pausa")
-            val textView11 = createTextView("Fin")
-            val textView12 = createTextView("Total")
+        val offsetToMonday = if (dayOfWeek == Calendar.SUNDAY) -6 else Calendar.MONDAY - dayOfWeek
+        calendar.add(Calendar.DAY_OF_YEAR, offsetToMonday)
 
-            // Añadir todos los TextView al LinearLayout
-            linearLayout.addView(textView8)
-            linearLayout.addView(textView9)
-            linearLayout.addView(textView10)
-            linearLayout.addView(textView11)
-            linearLayout.addView(textView12)
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val mainLayout = findViewById<LinearLayout>(R.id.mainLayout)
 
-            // Añadir el LinearLayout al layout principal
-            mainLayout.addView(linearLayout)
+        for (i in 1..7) {
+            val date = dateFormat.format(calendar.time)
 
-            // Añadir un divisor entre los LinearLayouts
-            val divider = View(this).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    1 // Altura del divisor
-                ).apply {
-                    setMargins(0, 10, 0, 10) // Márgenes opcionales
-                }
-                setBackgroundResource(android.R.color.darker_gray) // Color del divisor
-            }
-            mainLayout.addView(divider)
+            db.collection("registros_horarios")
+                    .document("trabajadores")
+                    .collection(uid)
+                    .document(date)
+                    .get()
+                    .addOnSuccessListener { document ->
+                        val inicio = document.getString("inicio") ?: "No disponible"
+                        val fin = document.getString("fin") ?: "No disponible"
+                        val pausas = document.get("pausas") as? List<Map<String, String>> ?: emptyList()
+                        val total = document.getString("tiempo_dia") ?: "No disponible"
+
+                        val pausaStr = if (pausas.isNotEmpty()) {
+                            pausas.joinToString { it["inicio"] ?: "Sin datos" }
+                        } else {
+                            "Sin pausas"
+                        }
+
+                        val linearLayout = LinearLayout(this).apply {
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                            )
+                            orientation = LinearLayout.HORIZONTAL
+                        }
+
+                        val textViewFecha = createTextView(date)
+                        val textViewInicio = createTextView(inicio)
+                        val textViewPausa = createTextView(pausaStr)
+                        val textViewFin = createTextView(fin)
+                        val textViewTotal = createTextView(total)
+
+                        linearLayout.addView(textViewFecha)
+                        linearLayout.addView(textViewInicio)
+                        linearLayout.addView(textViewPausa)
+                        linearLayout.addView(textViewFin)
+                        linearLayout.addView(textViewTotal)
+
+                        mainLayout.addView(linearLayout)
+
+                        val divider = View(this).apply {
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                1
+                            ).apply {
+                                setMargins(0, 10, 0, 10)
+                            }
+                            setBackgroundResource(android.R.color.darker_gray)
+                        }
+                        mainLayout.addView(divider)
+                    }
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
         }
     }
 
@@ -120,9 +171,10 @@ class HomeActivity : AppCompatActivity() {
             setTypeface(null, android.graphics.Typeface.BOLD)
         }
     }
-
     private fun setup(email: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+        totalSecondsWeek = sharedPreferences.getInt("totalSecondsWeek", 0)
 
         db.collection("users").document(uid).get()
             .addOnSuccessListener { document ->
@@ -135,117 +187,302 @@ class HomeActivity : AppCompatActivity() {
                     nameTextView.text = name
                     emailTextView.text = email
                 } else {
-                    println("No se encontró el documento del usuario.")
                     nameTextView.text = "Nombre no disponible"
                 }
             }
             .addOnFailureListener { e ->
-                println("Error al obtener el nombre del usuario: ${e.message}")
                 nameTextView.text = "Error al cargar el nombre"
             }
     }
 
 
     private fun setupTimeButtons() {
+        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val currentDate = dateFormat.format(Date())
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        var inicio: String? = null
+        var fin: String? = null
+
+        fun saveSessionData() {
+            val email = FirebaseAuth.getInstance().currentUser?.email ?: return
+            val year = currentDate.substring(0, 4)
+            val yearMonth = currentDate.substring(0, 7)
+
+            val sessionData = hashMapOf(
+                "email" to email,
+                "año" to year,
+                "añomes" to yearMonth,
+                "fecha" to currentDate,
+                "inicio" to inicio,
+                "fin" to fin,
+                "tiempo_dia" to timerDayTextView.text.toString(),
+                "tiempo_total" to timerWeekTextView.text.toString()
+            )
+            db.collection("registros_horarios")
+                .document("trabajadores")
+                .collection(uid)
+                .document(currentDate)
+                .set(sessionData)
+        }
         stopButton.setOnClickListener {
-            if (!isRunning && seconds>0) {
-                startTimer()
-                stopButton.text = "Pausa"
+            if (isRunning) {
+                pauseTimer()
+                startButton.isEnabled = false
 
-            } else if (isRunning && seconds>0){
-                stopTimer()
+                val options = arrayOf("Pausa por turno partido", "Pausa personal", "Pausa justificada")
+                var selectedOption = -1
+
+                val dialogBuilder = AlertDialog.Builder(this)
+                dialogBuilder.setTitle("Selecciona una opción")
+                    .setSingleChoiceItems(options, selectedOption) { dialog, which ->
+                        selectedOption = which
+                    }
+                    .setPositiveButton("Aceptar") { dialog, _ ->
+                        if (selectedOption != -1) {
+                            Toast.makeText(
+                                this,
+                                "Seleccionaste: ${options[selectedOption]}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            Toast.makeText(
+                                this,
+                                "No seleccionaste ninguna opción.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+
+                        val sessionData = hashMapOf(
+                            "pausa-inicio" to pauseStartDateTime,
+                            "pausa-fin" to pauseEndDateTime,
+                            "tipo" to options[selectedOption]
+                        )
+
+                        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@setPositiveButton
+
+                        db.collection("registros_horarios")
+                            .document("trabajadores")
+                            .collection(uid)
+                            .document(currentDate)
+                            .update("pausas", FieldValue.arrayUnion(sessionData))
+                            .addOnSuccessListener {
+                                Toast.makeText(this, "Pausa registrada correctamente", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(this, "Error al registrar la pausa: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                    .setNegativeButton("Cancelar") { dialog, _ ->
+                        dialog.dismiss()
+                    }
+
+                val alertDialog = dialogBuilder.create()
+                alertDialog.show()
                 stopButton.text = "Reanudar"
-
+            } else {
+                pauseTimer()
+                startButton.isEnabled = true
+                stopButton.text = "Pausa"
             }
         }
-
         startButton.setOnClickListener {
+
             if (isRunning) {
+                fin = timeFormat.format(Date())
                 stopTimer()
-                startButton.text = "Empezar"
-                saveSessionData()
+                startButton.text = "Finalizado"
+                stopButton.isEnabled = false
+                startButton.isEnabled = false
+                val sessionData = hashMapOf<String, Any?>(
+                    "fin" to fin
+                )
+                db.collection("registros_horarios")
+                    .document("trabajadores")
+                    .collection(uid)
+                    .document(currentDate)
+                    .set(sessionData, SetOptions.merge())
+                    .addOnSuccessListener {
+                        saveSessionData()
+                    }
             } else {
+                inicio = timeFormat.format(Date())
                 startTimer()
                 startButton.text = "Terminar"
+
+                val sessionDataInicio = hashMapOf<String, Any?>(
+                    "inicio" to inicio
+                )
+                db.collection("registros_horarios")
+                    .document("trabajadores")
+                    .collection(uid)
+                    .document(currentDate)
+                    .set(sessionDataInicio, SetOptions.merge())
+
             }
         }
     }
 
     private fun startTimer() {
+        if (currentDayOfWeek == 1 && !hasResetHours) {
+            totalSecondsWeek = 0
+            hasResetHours = true
+        }
+        val totalHoursDay = hoursDayTextView.text.toString().toFloatOrNull() ?: 0f
+        val totalSecondsDay = (totalHoursDay * 3600).toInt()
+        val totalHoursWeek = hoursWeekTextView.text.toString().toFloatOrNull() ?: 0f
+        val totalSecondsWeekAll = (totalHoursWeek * 3600).toInt()
         isRunning = true
         timerJob = CoroutineScope(Dispatchers.Main).launch {
             while (isRunning) {
-                val hours = seconds / 3600
-                val minutes = (seconds % 3600) / 60
-                val secs = seconds % 60
+                currentDaySeconds++
+                totalSecondsWeek++
 
-                val time = String.format("%02d:%02d:%02d", hours, minutes, secs)
-                timerDayTextView.text = time
+                val hoursToday = currentDaySeconds / 3600
+                val minutesToday = (currentDaySeconds % 3600) / 60
+                val secsToday = currentDaySeconds % 60
 
-                seconds++
+                val hoursWeek = totalSecondsWeek / 3600
+                val minutesWeek = (totalSecondsWeek % 3600) / 60
+                val secsWeek = totalSecondsWeek % 60
+
+                val timeToday = String.format("%02d:%02d:%02d", hoursToday, minutesToday, secsToday)
+                val timeWeek = String.format("%02d:%02d:%02d", hoursWeek, minutesWeek, secsWeek)
+                
+                timerDayTextView.text = timeToday
+                timerWeekTextView.text = timeWeek
+
+                if (totalSecondsDay > 0) {
+                    val percentageDay = (currentDaySeconds.toFloat() / totalSecondsDay) * 100
+                    percentageDayTextView.text = String.format("%.2f%%", percentageDay)
+                } else {
+                    percentageDayTextView.text = "N/A"
+                }
+                if (totalSecondsWeekAll > 0) {
+                    val percentageWeek = (totalSecondsWeek.toFloat() / totalSecondsWeekAll) * 100
+                    percentageWeekTextView.text = String.format("%.2f%%", percentageWeek)
+                } else {
+                    percentageWeekTextView.text = "N/A"
+                }
 
                 delay(1000L)
             }
         }
     }
-
     private fun stopTimer() {
         isRunning = false
-        timerJob?.cancel()
+        saveTimeToPreferences()
     }
-    private fun saveSessionData() {
+    private fun pauseTimer() {
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val currentDate = dateFormat.format(Date())
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val email = FirebaseAuth.getInstance().currentUser?.email ?: return
-        val year = currentDate.substring(0, 4)
-        val yearMonth = currentDate.substring(0, 7)
-        db.collection("horarios").document("1").get()
-        val sessionData = hashMapOf(
-            "email" to email,
-            "año" to year,
-            "añomes" to yearMonth,
-            "fecha" to currentDate,
-            "fin" to "",
-            "inicio" to "",
-            "tiempo_dia" to timerDayTextView.text.toString(),
-            "tiempo_total" to timerWeekTextView.text.toString(),
-        )
+        if (!isPaused) {
+            pauseStartTime = System.currentTimeMillis()
+            pauseStartDateTime = dateFormat.format(Date(pauseStartTime))
+            isPaused = true
 
-        db.collection("registros_horarios")
-            .document("trabajadores")
-            .collection(uid)
-            .document(currentDate)
-            .set(sessionData)
-            .addOnSuccessListener {
-                println("Datos guardados correctamente con UID: $uid en la fecha $currentDate")
+            isRunning = false
+        } else {
+            val pauseEndTime = System.currentTimeMillis()
+            pauseEndDateTime = dateFormat.format(Date(pauseEndTime))
+
+            val pauseDuration = pauseEndTime - pauseStartTime
+
+            if (pauseDuration < 2 * 60 * 60 * 1000) {
+                totalPauseDuration += pauseDuration
+            } else {
+                totalPauseDuration = 0
             }
-            .addOnFailureListener { e ->
-                println("Error al guardar los datos: ${e.message}")
-            }
+            isRunning = true
+            startTimer()
+            isPaused = false
+
+            println("Pausa iniciada a: $pauseStartDateTime, Pausa terminada a: $pauseEndDateTime")
         }
-    private fun arrayDias() {
+    }
+
+    private fun saveTimeToPreferences() {
+        val editor = sharedPreferences.edit()
+        editor.putInt("totalSecondsWeek", totalSecondsWeek)
+        editor.apply()
+    }
+    private fun hoursDay() {
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
         db.collection("horarios").document("1").get()
             .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    val diasNumericos = document.get("dias") as? List<Long>
-                    if (diasNumericos != null) {
-                        val diasSemana = listOf("Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado")
-                        for (numero in diasNumericos) {
-                            if (numero in 0..6) {
-                                val dia = diasSemana[numero.toInt()]
-                                println("Día: $dia")
-                            }
+                if (document != null && document.exists()) {
+                    val diasList = document.get("dias") as? List<Map<String, String>> ?: emptyList()
+
+                    val diaActual = diasList.getOrNull(currentDayOfWeek)
+                    val inicio: String
+                    val fin: String
+                    if (diaActual != null) {
+                        inicio = diaActual["inicio"] ?: "Hora de inicio no disponible"
+                        fin = diaActual["fin"] ?: "Hora de fin no disponible"
+                    } else {
+                        inicio = "Hora de inicio no disponible"
+                        fin = "Hora de fin no disponible"
+                    }
+                    if (inicio != "Hora de inicio no disponible" && fin != "Hora de fin no disponible") {
+                        try {
+                            val inicioDate = timeFormat.parse(inicio)
+                            val finDate = timeFormat.parse(fin)
+
+                            val differenceMillis = finDate.time - inicioDate.time
+
+                            val differenceHours = differenceMillis / (1000 * 60 * 60).toFloat()
+                            hoursDayTextView.text = String.format("%.2f", differenceHours)
+
+                        } catch (e: ParseException) {
+                            println("Error al parsear las horas: ${e.message}")
                         }
                     } else {
-                        println("El array 'dias' no está disponible.")
+                        println("No se puede calcular la diferencia de horas. Inicio o fin no disponibles.")
                     }
                 }
             }
+    }
+    private fun hoursWeek() {
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        var totalHours = 0.0
+
+        if (currentDayOfWeek == 0 && !hasResetHours) {
+            totalHours = 0.0
+            hasResetHours = true
+        }
+
+
+        db.collection("horarios").document("1").get()
+            .addOnSuccessListener { document ->
+                if (document != null && document.exists()) {
+                    val diasList = document.get("dias") as? List<Map<String, String>> ?: emptyList()
+
+                    for (dia in diasList) {
+                        val inicio = dia["inicio"] ?: "Hora de inicio no disponible"
+                        val fin = dia["fin"] ?: "Hora de fin no disponible"
+
+                        if (inicio != "Hora de inicio no disponible" && fin != "Hora de fin no disponible") {
+                            try {
+                                val inicioDate = timeFormat.parse(inicio)
+                                val finDate = timeFormat.parse(fin)
+
+                                val differenceMillis = finDate.time - inicioDate.time
+
+                                val differenceHours = differenceMillis / (1000 * 60 * 60).toFloat()
+                                totalHours += differenceHours
+
+                            } catch (e: ParseException) {
+                                println("Error al parsear las horas: ${e.message}")
+                            }
+                        }
+                    }
+                    hoursWeekTextView.text = String.format("%.2f", totalHours)
+                }
+            }
             .addOnFailureListener { e ->
-                println("Error al obtener el array de días: ${e.message}")
+                hoursWeekTextView.text = "Error al calcular horas"
             }
     }
-
- }
+}

@@ -52,7 +52,7 @@
             <TextView
                 android:id="@+id/nameTextView"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="30dp"
                 android:layout_marginStart="16dp"
                 android:height="40dp"
                 android:text="nameTextView"
@@ -61,7 +61,7 @@
             <TextView
                 android:id="@+id/emailTextView"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="30dp"
                 android:layout_marginStart="16dp"
                 android:height="40dp"
                 android:text="emailTextView" />
@@ -69,7 +69,7 @@
             <TextView
                 android:id="@+id/dayTextView"
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
+                android:layout_height="65dp"
                 android:text="Día"
                 android:textAlignment="center"
                 android:textSize="34sp"
@@ -85,7 +85,7 @@
                 android:id="@+id/hoursDayTextView"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
-                android:text="hoursDayTextView"
+                android:text="0"
                 android:textAlignment="center"
                 android:textSize="34sp"
                 android:textStyle="bold" />
@@ -105,11 +105,34 @@
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/timerDayTextView"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="TextView" />
+                android:orientation="horizontal"
+                android:padding="10dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/percentageDayTextView"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="0.00%"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:gravity="center"/>
+
+                <TextView
+                    android:id="@+id/timerDayTextView"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="00:00:00"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:gravity="center"/>
+            </LinearLayout>
+
 
             <ProgressBar
                 android:id="@+id/progressBar"
@@ -123,7 +146,7 @@
             <TextView
                 android:id="@+id/weekTextView"
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
+                android:layout_height="65dp"
                 android:text="Semana"
                 android:textAlignment="center"
                 android:textSize="34sp"
@@ -139,7 +162,7 @@
                 android:id="@+id/hoursWeekTextView"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
-                android:text="hoursWeekTextView"
+                android:text="0"
                 android:textAlignment="center"
                 android:textSize="34sp"
                 android:textStyle="bold" />
@@ -159,11 +182,34 @@
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/timerWeekTextView"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="TextView" />
+                android:orientation="horizontal"
+                android:padding="10dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/percentageWeekTextView"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="0.00%"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:gravity="center"/>
+
+                <TextView
+                    android:id="@+id/timerWeekTextView"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="00:00:00"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:gravity="center"/>
+            </LinearLayout>
+
 
             <ProgressBar
                 android:id="@+id/progressBar2"
